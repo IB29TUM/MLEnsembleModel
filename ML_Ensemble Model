@@ -1,0 +1,205 @@
+import csv
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.metrics import confusion_matrix
+from sklearn.model_selection import train_test_split
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score
+from sklearn.metrics import classification_report
+import pandas as pd
+
+
+with open("Y1.csv",'r')as f :
+    data_list1 = list(csv.reader(f, delimiter=";"))
+H = np.array(data_list1[0:])
+
+with open("Y2.csv",'r')as f :
+    data_list2 = list(csv.reader(f, delimiter=";"))
+A = np.array(data_list2[0:])
+
+with open("Y3.csv",'r')as f :
+    data_list3 = list(csv.reader(f, delimiter=";"))
+T = np.array(data_list3[0:])
+
+with open("X1.csv",'r')as f :
+    data_list4 = list(csv.reader(f, delimiter=";"))
+Hs = np.array(data_list4[0:])
+
+with open("X2.csv",'r')as f :
+    data_list5 = list(csv.reader(f, delimiter=";"))
+Ht = np.array(data_list5[0:])
+
+with open("X3.csv",'r')as f :
+    data_list6 = list(csv.reader(f, delimiter=";"))
+Cv = np.array(data_list6[0:])
+
+X4= np.append(Hs,Ht,axis=1)
+X= np.append(X4,Cv,axis=1)
+X=X.T
+X=X.astype(np.float)
+H=H.astype(np.float)
+H=H.T
+A=A.astype(np.float)
+A=A.T
+T=T.astype(np.float)
+T=T.T
+
+def sigmoid(z):
+    s= 1/(1+np.exp(-1*z))
+    return s
+
+def initialize_with_zeros(dim):
+    k = (dim, 1)
+    w = np.zeros(k)
+    b = 0
+    assert (w.shape == (dim, 1))
+    assert (isinstance(b, float) or isinstance(b, int))
+    return w, b
+
+def propagate(w, b, X, Y):
+    m = X.shape[1]
+    z = np.dot(w.T,X)+b
+    Ac = 1/(1+np.exp(-1*z))
+    cost = np.sum(Y * np.log(Ac) + (1-Y) * (np.log(1-Ac)))
+    cost = -cost/m
+    dw = np.dot(X,(Ac-Y).T)
+    dw = dw/m
+    db = np.sum(Ac-Y)
+    db = db/m
+    assert (dw.shape == w.shape)
+    assert (db.dtype == float)
+    cost = np.squeeze(cost)
+    assert (cost.shape == ())
+    gradients = {"dw": dw,
+                 "db": db}
+    return gradients, cost
+
+def optimize(w, b, X, Y, num_iterations, learning_rate, print_cost=False):
+    costs = []
+    for i in range(num_iterations):
+        gradients, cost = propagate(w,b,X,Y)
+        dw = gradients["dw"]
+        db = gradients["db"]
+        w = w-((learning_rate)*dw)
+        b = b-((learning_rate)*db)
+        if i % 100 == 0:
+            costs.append(cost)
+        if print_cost and i % 100 == 0:
+            print("Cost after iteration %i: %f" % (i, cost))
+
+    parameters = {"w": w,
+                  "b": b}
+
+    gradients = {"dw": dw,
+                 "db": db}
+
+    return parameters, gradients, costs
+
+def predict(w, b, X):
+    m = X.shape[1]
+    Y_predict = np.zeros((1, m))
+    w = w.reshape(X.shape[0], 1)
+    z = np.dot(w.T,X)+b
+    Ac = sigmoid(z)
+    for i in range(Ac.shape[1]):
+        if Ac[0,i]< 0.5:
+            Y_predict[0,i] = 0
+        else:
+            Y_predict[0,i] = 1
+
+    assert (Y_predict.shape == (1, m))
+
+    return Y_predict
+
+def logreg(X, Y, num_iterations,learning_rate, print_cost=False):
+    w, b = initialize_with_zeros(X.shape[0])
+    parameters, gradients, costs = optimize(w, b, X, Y, num_iterations, learning_rate, print_cost=False)
+
+    w = parameters["w"]
+    b = parameters["b"]
+
+    Y_prediction_final = predict(w, b, X)
+    return Y_prediction_final
+
+i = logreg(X,H,num_iterations = 20000, learning_rate = 0.005, print_cost = True)
+j = logreg(X,A,num_iterations = 20000, learning_rate = 0.005, print_cost = True)
+k = logreg(X,T,num_iterations = 20000, learning_rate = 0.005, print_cost = True)
+i=i.T
+j=j.T
+k=k.T
+X=X.T
+
+
+def splitdataset(X,Y):
+    X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.5, random_state=100)
+    return X, Y, X_train, X_test, Y_train, Y_test
+
+def train_using_gini(X_train, X_test, y_train):
+    # Creating the classifier object
+    clf_gini = DecisionTreeClassifier(criterion="gini", random_state=100, max_depth=3, min_samples_leaf=5)
+
+    # Performing training
+    clf_gini.fit(X_train, y_train)
+    return clf_gini
+
+def tarin_using_entropy(X_train, X_test, y_train):
+    # Decision tree with entropy
+    clf_entropy = DecisionTreeClassifier(criterion="entropy", random_state=100, max_depth=3, min_samples_leaf=5)
+
+    # Performing training
+    clf_entropy.fit(X_train, y_train)
+    return clf_entropy
+
+def prediction(X_test, clf_object):
+    # Predicton on test with giniIndex
+    y_pred = clf_object.predict(X_test)
+    return y_pred
+
+def dectree(Xset,Yset):
+    # Building Phase
+    X, Y, X_train, X_test, y_train, y_test = splitdataset(Xset,Yset)
+    clf_gini = train_using_gini(X_train, X_test, y_train)
+    clf_entropy = tarin_using_entropy(X_train, X_test, y_train)
+
+    # Prediction using gini
+    y_pred_gini = prediction(X_test, clf_gini)
+    return X_test,y_pred_gini
+
+p,l=dectree(X,i)
+q,m=dectree(X,j)
+r,n=dectree(X,k)
+
+def splitdata(X,Y):
+    X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.5, random_state=100)
+    return X, Y, X_train, X_test, Y_train, Y_test
+
+def gaussian_classifier(X_train,X_test,y_train):
+    clf = RandomForestClassifier(n_estimators=100)
+    clf.fit(X_train, y_train)
+    y_pred = clf.predict(X_test)
+    print(y_pred)
+    return y_pred
+
+def cal_accuracy(y_test, y_pred):
+    print("Confusion Matrix: ", confusion_matrix(y_test, y_pred))
+
+    print("Accuracy : ", accuracy_score(y_test, y_pred) * 100)
+
+    print("Report : ", classification_report(y_test, y_pred))
+    pd.DataFrame(classification_report(y_test, y_pred, output_dict=True))
+
+def randfor(Xset,Yset):
+    # Building Phase
+    X, Y, X_train, X_test, y_train, y_test = splitdata(Xset,Yset)
+    clf_gauss = gaussian_classifier(X_train, X_test, y_train)
+    # Prediction using gaussian classifier
+    cal_accuracy(y_test, clf_gauss)
+    return clf_gauss
+
+print("Results Using Ensemble Model for H vs (Hs,Ht,Cv):")
+f=randfor(p,l)
+print("Results Using Ensemble Model for A vs (Hs,Ht,Cv):")
+g=randfor(q,m)
+print("Results Using Ensemble Model for T vs (Hs,Ht,Cv):")
+h=randfor(r,n)
